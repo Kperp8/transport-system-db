@@ -511,30 +511,4 @@ END
 ;;
 delimiter ;
 
--- ----------------------------
--- Triggers structure for table users
--- ----------------------------
-DROP TRIGGER IF EXISTS `utworz_login`;
-delimiter ;;
-CREATE TRIGGER `utworz_login` BEFORE INSERT ON `users` FOR EACH ROW BEGIN
-IF NEW.login is NULL OR NEW.login = '' THEN
-	Set NEW.login = LOWER(CONCAT(LEFT(NEW.imie,1), NEW.nazwisko));
-END IF;
-END
-;;
-delimiter ;
-
--- ----------------------------
--- Triggers structure for table uzytkownicy
--- ----------------------------
-DROP TRIGGER IF EXISTS `wersjonowanie`;
-delimiter ;;
-CREATE TRIGGER `wersjonowanie` AFTER UPDATE ON `uzytkownicy` FOR EACH ROW BEGIN
-
-INSERT INTO users_archiwum (
-id_users, login, imie, nazwisko, haslo, utworzono, modyfikowano
-) VALUES (OLD.id_uzytkownicy, OLD.login, OLD.imie, OLD.nazwisko, OLD.haslo, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-END
-;;
-
 SET FOREIGN_KEY_CHECKS = 1;

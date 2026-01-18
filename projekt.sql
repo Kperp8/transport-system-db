@@ -548,4 +548,66 @@ END
 ;;
 delimiter ;
 
+DROP PROCEDURE IF EXISTS `WykonajKontrole_All`;
+delimiter ;;
+CREATE PROCEDURE `WykonajKontrole_All`()
+BEGIN
+    DECLARE done INT DEFAULT 0;
+    DECLARE v_id_biletu INT;
+    DECLARE v_kod_biletu VARCHAR(64);
+    DECLARE v_kontroler VARCHAR(20);
+    DECLARE v_pojazd VARCHAR(20);
+    DECLARE v_idx_ctrl INT DEFAULT 0;
+    DECLARE v_idx_poj INT DEFAULT 0;
+    DECLARE v_count_ctrl INT;
+    DECLARE v_count_poj INT;
+    DECLARE v_count_bilety INT;
+
+    SELECT COUNT(*) INTO v_count_ctrl FROM Kontrolerzy;
+    SELECT COUNT(*) INTO v_count_poj FROM Pojazdy;
+    SELECT COUNT(*) INTO v_count_bilety 
+    FROM Bilety_Sprzedane b
+    WHERE NOT EXISTS (SELECT 1 FROM Kontrole_Biletow kb WHERE kb.id_biletu = b.id_biletu);
+
+    SET v_idx_ctrl = 0;
+    SET v_idx_poj = 0;
+    SET done = 0;
+
+    WYKONAJ_PETLE: WHILE done = 0 DO
+        IF v_count_bilety = 0 THEN
+            LEAVE WYKONAJ_PETLE;
+        END IF;
+
+        SELECT id_biletu, kod_biletu INTO v_id_biletu, v_kod_biletu
+        FROM Bilety_Sprzedane b
+        WHERE NOT EXISTS (SELECT 1 FROM Kontrole_Biletow kb WHERE kb.id_biletu = b.id_biletu)
+        ORDER BY data_zakupu
+        LIMIT 1;
+
+        SET v_idx_ctrl = (v_idx_ctrl MOD v_count_ctrl);
+        SELECT numer_sluzbowy INTO v_kontroler
+        FROM Kontrolerzy
+        ORDER BY id_kontrolera
+        LIMIT v_idx_ctrl,1;
+        SET v_idx_ctrl = v_idx_ctrl + 1;
+
+        SET v_idx_poj = (v_idx_poj MOD v_count_poj);
+        SELECT numer_boczny INTO v_pojazd
+        FROM Pojazdy
+        ORDER BY id_pojazdu
+        LIMIT v_idx_poj,1;
+        SET v_idx_poj = v_idx_poj + 1;
+
+        CALL WykonajKontrole_UczciwyMandat(v_kontroler, v_pojazd, v_kod_biletu);
+        SET v_count_bilety = v_count_bilety - 1;
+    END WHILE WYKONAJ_PETLE;
+END
+;;
+delimiter ;
+
+-- trzeba uprawnień SUPER, bez tego eventy nie działają
+-- SET GLOBAL event_scheduler = ON; 
+-- DROP EVENT IF EXISTS `Kontrola`;
+-- CREATE EVENT `Kontrola` ON SCHEDULE EVERY 3 HOUR DO CALL WykonajKontrole_All();
+
 SET FOREIGN_KEY_CHECKS = 1;

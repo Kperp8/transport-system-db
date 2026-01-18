@@ -151,6 +151,7 @@ Rejestr wpłat za mandaty.
 ## 8. Funkcje
 
 - **CzyBiletWazny(p_id_biletu, p_id_pojazdu)**: Sprawdza czy bilet jest ważny w danym pojeździe (weryfikuje czas i strefę).
+- **Przewidywany_Czas_Trasy(p_id_trasy)**: Zwraca przewidywany czas, jaki zajmie ukończenie trasy.
 
 ## 9. Triggery
 

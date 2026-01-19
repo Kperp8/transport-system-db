@@ -62,8 +62,7 @@ CREATE TABLE `Kontrole_Biletow`  (
   INDEX `id_pojazdu`(`id_pojazdu` ASC) USING BTREE,
   INDEX `id_biletu`(`id_biletu` ASC) USING BTREE,
   CONSTRAINT `Kontrole_Biletow_ibfk_1` FOREIGN KEY (`id_kontrolera`) REFERENCES `Kontrolerzy` (`id_kontrolera`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `Kontrole_Biletow_ibfk_2` FOREIGN KEY (`id_pojazdu`) REFERENCES `Pojazdy` (`id_pojazdu`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `Kontrole_Biletow_ibfk_3` FOREIGN KEY (`id_biletu`) REFERENCES `Bilety_Sprzedane` (`id_biletu`) ON DELETE RESTRICT ON UPDATE RESTRICT
+  CONSTRAINT `Kontrole_Biletow_ibfk_2` FOREIGN KEY (`id_pojazdu`) REFERENCES `Pojazdy` (`id_pojazdu`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_general_ci ROW_FORMAT = Dynamic WITH SYSTEM VERSIONING;
 
 INSERT INTO `Kontrole_Biletow` VALUES (1, '2026-01-08 01:14:10', 1, 1, 2, 'MANDAT: 125.00 PLN (Zastosowano ulgę pasażera)');
@@ -119,7 +118,6 @@ CREATE TABLE `Platnosci`  (
   PRIMARY KEY (`id_platnosci`) USING BTREE,
   INDEX `id_biletu`(`id_biletu` ASC) USING BTREE,
   INDEX `id_metody`(`id_metody` ASC) USING BTREE,
-  CONSTRAINT `Platnosci_ibfk_1` FOREIGN KEY (`id_biletu`) REFERENCES `Bilety_Sprzedane` (`id_biletu`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `Platnosci_ibfk_2` FOREIGN KEY (`id_metody`) REFERENCES `Slownik_Metod_Platnosci` (`id_metody`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_general_ci ROW_FORMAT = Dynamic WITH SYSTEM VERSIONING;
 

@@ -141,12 +141,17 @@ Rejestr wpłat za mandaty.
 - **Raport_Przychodow_Total**: Podsumowanie łącznych przychodów ze sprzedaży biletów oraz wpływów z mandatów.
 - **Aktywne_Bilety**: Podsumowanie wszystkich obecnie ważnych biletów. Wykorzystuje *CTE*.
 - **Przychody_Po_Biletach**: Podsumowanie łączych przychodów ze sprzedaży biletów z podziałem na typy biletów. Wykorzystuje *CTE*.
+- **Widok_Popularnosc_Linii_Biletowej**: Podsumowanie popularności (ilości użyć) biletów poszczególnych linii.
+- **Widok_Rentownosc_Linii**: Podsumowanie przychodów w podziale na linie.
+- **Widok_Skutecznosc_Windykacji**: Podsumowanie informacji spłacaniu mandatów.
+- **Czasy_Przejechania_Tras**: Podsumowanie średniego czasu potrzebnego na przejechanie trasy.
 
 ## 7. Procedury Składowane
 
 - **ZakupBiletu(p_id_pasazera, p_id_definicji, p_id_metody)**: Obsługuje zakup biletu z automatycznym naliczeniem ulgi, wygenerowaniem kodu QR i rejestracją płatności.
 - **WykonajKontrole_UczciwyMandat(p_num_kontrolera, p_num_pojazdu, p_kod_skanowany)**: Przeprowadza kontrolę biletu, sprawdza ważność i strefę, wystawia mandat z uwzględnieniem ulgi pasażera.
 - **OplacMandat(p_id_wezwania, p_id_metody)**: Rejestruje wpłatę za mandat i aktualizuje jego status.
+- **WykonajKontrole_All**: Wykonuje kontrole wszystkich biletów.
 
 ## 8. Funkcje
 

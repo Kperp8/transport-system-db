@@ -307,6 +307,12 @@ SELECT
     (SELECT SUM(`Platnosci`.`kwota_brutto`) FROM `Platnosci`) AS `Suma_Bilety`,
     (SELECT SUM(`Platnosci_Wezwan`.`kwota_wplacona`) FROM `Platnosci_Wezwan`) AS `Suma_Mandaty`;
 
+DROP VIEW IF EXISTS `Aktywne_Bilety`;	
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Aktywne_Bilety` AS WITH WazneBilety AS ( SELECT * FROM Bilety_Sprzedane WHERE NOW() BETWEEN data_waznosci_od AND data_waznosci_do ) SELECT wb.id_biletu, wb.id_pasazera, p.imie, p.nazwisko, su.nazwa_ulgi, ss.nazwa_strefy, wb.data_zakupu, wb.data_waznosci_do FROM WazneBilety wb JOIN Pasazerowie p ON wb.id_pasazera = p.id_pasazera JOIN Slownik_Ulg su ON wb.id_ulgi = su.id_ulgi JOIN Bilety_Definicje bd ON wb.id_definicji = bd.id_definicji JOIN Slownik_Stref ss ON bd.id_strefy = ss.id_strefy;	
+
+DROP VIEW IF EXISTS `Przychody_Po_Biletach`;	
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Przychody_Po_Biletach` AS WITH Sprzedaz AS ( SELECT b.id_definicji, p.kwota_brutto FROM Bilety_Sprzedane b JOIN Platnosci p ON b.id_biletu = p.id_biletu ) SELECT d.nazwa_biletu, SUM(s.kwota_brutto) AS suma_przychodow FROM Sprzedaz s JOIN Bilety_Definicje d ON s.id_definicji = d.id_definicji GROUP BY d.nazwa_biletu;
+
 DROP VIEW IF EXISTS `Widok_Popularnosc_Linii_Biletowej`;
 CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Widok_Popularnosc_Linii_Biletowej` AS
 SELECT
@@ -376,6 +382,30 @@ BEGIN
 END
 ;;
 delimiter ;
+
+DROP FUNCTION IF EXISTS `Przewidywany_Czas_Trasy`;	
+delimiter ;;	
+
+CREATE FUNCTION `Przewidywany_Czas_Trasy`(p_id_trasy INT)	
+RETURNS TIME	
+DETERMINISTIC	
+BEGIN	
+    DECLARE avg_predkosc_ms DECIMAL(5,2) DEFAULT 5.0;	
+    DECLARE dlugosc_m DOUBLE;	
+    SELECT SUM(ST_Distance_Sphere(p1.lokalizacja, p2.lokalizacja))	
+    INTO dlugosc_m	
+    FROM Trasy_Przystanki tp1	
+    JOIN Przystanki p1 ON tp1.id_przystanku = p1.id_przystanku	
+    JOIN Trasy_Przystanki tp2 ON tp2.id_trasy = tp1.id_trasy AND tp2.kolejnosc = tp1.kolejnosc + 1	
+    JOIN Przystanki p2 ON tp2.id_przystanku = p2.id_przystanku	
+    WHERE tp1.id_trasy = p_id_trasy;	
+    RETURN SEC_TO_TIME(dlugosc_m / avg_predkosc_ms);	
+END	
+;;	
+delimiter ;	
+
+DROP VIEW IF EXISTS `Czasy_Przejechania_Tras`;	
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Czasy_Przejechania_Tras` AS SELECT id_trasy, Przewidywany_Czas_Trasy(id_trasy) AS przewidywany_czas FROM Trasy;
 
 DROP PROCEDURE IF EXISTS `OplacMandat`;
 delimiter ;;

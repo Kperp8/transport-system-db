@@ -687,3 +687,417 @@ delimiter ;
 -- CREATE EVENT `Kontrola` ON SCHEDULE EVERY 3 HOUR DO CALL WykonajKontrole_All();
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+
+DROP TABLE IF EXISTS `Harmonogram_Kursow`;
+CREATE TABLE `Harmonogram_Kursow` (
+    `id_kursu` INT(11) NOT NULL AUTO_INCREMENT,
+    `id_pojazdu` INT(11) NOT NULL,
+    `id_trasy` INT(11) NOT NULL,
+    `godzina_rozpoczecia` TIME NOT NULL,
+    `godzina_zakonczenia` TIME NOT NULL,
+    `dzien_tygodnia` TINYINT(1) NOT NULL,
+    `aktywny` TINYINT(1) DEFAULT 1,
+    PRIMARY KEY (`id_kursu`),
+    INDEX `idx_pojazd` (`id_pojazdu`),
+    INDEX `idx_trasa` (`id_trasy`),
+    INDEX `idx_dzien` (`dzien_tygodnia`),
+    CONSTRAINT `fk_harmonogram_pojazd` FOREIGN KEY (`id_pojazdu`) REFERENCES `Pojazdy` (`id_pojazdu`) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT `fk_harmonogram_trasa` FOREIGN KEY (`id_trasy`) REFERENCES `Trasy` (`id_trasy`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+INSERT INTO `Harmonogram_Kursow` (`id_pojazdu`, `id_trasy`, `godzina_rozpoczecia`, `godzina_zakonczenia`, `dzien_tygodnia`, `aktywny`) VALUES
+(1, 1, '06:00:00', '14:00:00', 1, 1),
+(1, 1, '06:00:00', '14:00:00', 2, 1),
+(1, 1, '06:00:00', '14:00:00', 3, 1),
+(1, 1, '06:00:00', '14:00:00', 4, 1),
+(1, 1, '06:00:00', '14:00:00', 5, 1),
+(2, 2, '05:30:00', '13:30:00', 1, 1),
+(2, 2, '05:30:00', '13:30:00', 2, 1),
+(2, 2, '05:30:00', '13:30:00', 3, 1),
+(2, 2, '05:30:00', '13:30:00', 4, 1),
+(2, 2, '05:30:00', '13:30:00', 5, 1),
+(3, 3, '14:00:00', '22:00:00', 1, 1),
+(3, 3, '14:00:00', '22:00:00', 2, 1),
+(3, 3, '14:00:00', '22:00:00', 3, 1),
+(4, 4, '08:00:00', '16:00:00', 6, 1),
+(4, 4, '08:00:00', '16:00:00', 7, 1),
+(5, 1, '14:00:00', '22:00:00', 1, 1),
+(5, 1, '14:00:00', '22:00:00', 2, 1);
+
+DROP TABLE IF EXISTS `Raporty_Dzienne`;
+CREATE TABLE `Raporty_Dzienne` (
+    `id_raportu` INT(11) NOT NULL AUTO_INCREMENT,
+    `data_raportu` DATE NOT NULL,
+    `liczba_sprzedanych_biletow` INT(11) DEFAULT 0,
+    `przychod_bilety` DECIMAL(12,2) DEFAULT 0.00,
+    `liczba_kontroli` INT(11) DEFAULT 0,
+    `liczba_mandatow` INT(11) DEFAULT 0,
+    `przychod_mandaty` DECIMAL(12,2) DEFAULT 0.00,
+    `liczba_nowych_pasazerow` INT(11) DEFAULT 0,
+    `data_wygenerowania` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id_raportu`),
+    UNIQUE KEY `uk_data_raportu` (`data_raportu`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+DROP TABLE IF EXISTS `Raporty_Tygodniowe`;
+CREATE TABLE `Raporty_Tygodniowe` (
+    `id_raportu` INT(11) NOT NULL AUTO_INCREMENT,
+    `rok` INT(4) NOT NULL,
+    `tydzien` INT(2) NOT NULL,
+    `data_od` DATE NOT NULL,
+    `data_do` DATE NOT NULL,
+    `liczba_sprzedanych_biletow` INT(11) DEFAULT 0,
+    `przychod_bilety` DECIMAL(12,2) DEFAULT 0.00,
+    `liczba_kontroli` INT(11) DEFAULT 0,
+    `liczba_mandatow` INT(11) DEFAULT 0,
+    `przychod_mandaty` DECIMAL(12,2) DEFAULT 0.00,
+    `liczba_nowych_pasazerow` INT(11) DEFAULT 0,
+    `data_wygenerowania` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id_raportu`),
+    UNIQUE KEY `uk_rok_tydzien` (`rok`, `tydzien`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+DROP PROCEDURE IF EXISTS `DodajPasazera`;
+delimiter ;;
+CREATE PROCEDURE `DodajPasazera`(
+    IN p_imie VARCHAR(50),
+    IN p_nazwisko VARCHAR(50),
+    IN p_email VARCHAR(100),
+    IN p_id_ulgi INT
+)
+proc_label: BEGIN
+    DECLARE v_id_nowego_pasazera INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'BŁĄD: Nie udało się dodać pasażera. Sprawdź czy email jest unikalny i poprawny.' AS Status;
+    END;
+    IF p_id_ulgi IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM Slownik_Ulg WHERE id_ulgi = p_id_ulgi) THEN
+            SELECT 'BŁĄD: Podana ulga nie istnieje w systemie.' AS Status;
+            LEAVE proc_label;
+        END IF;
+    END IF;
+    START TRANSACTION;
+    INSERT INTO Pasazerowie (imie, nazwisko, email, id_ulgi, data_rejestracji)
+    VALUES (p_imie, p_nazwisko, p_email, COALESCE(p_id_ulgi, 1), NOW());
+    SET v_id_nowego_pasazera = LAST_INSERT_ID();
+    COMMIT;
+    SELECT 'SUKCES' AS Status, v_id_nowego_pasazera AS ID_Pasazera, CONCAT(p_imie, ' ', p_nazwisko) AS Pasazer;
+END
+;;
+delimiter ;
+
+DROP PROCEDURE IF EXISTS `EdytujPasazera`;
+delimiter ;;
+CREATE PROCEDURE `EdytujPasazera`(
+    IN p_id_pasazera INT,
+    IN p_imie VARCHAR(50),
+    IN p_nazwisko VARCHAR(50),
+    IN p_email VARCHAR(100),
+    IN p_id_ulgi INT
+)
+BEGIN
+    DECLARE v_istnieje INT DEFAULT 0;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'BŁĄD: Nie udało się zaktualizować danych pasażera.' AS Status;
+    END;
+    SELECT COUNT(*) INTO v_istnieje FROM Pasazerowie WHERE id_pasazera = p_id_pasazera;
+    IF v_istnieje = 0 THEN
+        SELECT 'BŁĄD: Pasażer o podanym ID nie istnieje.' AS Status;
+    ELSE
+        START TRANSACTION;
+        UPDATE Pasazerowie SET
+            imie = COALESCE(p_imie, imie),
+            nazwisko = COALESCE(p_nazwisko, nazwisko),
+            email = COALESCE(p_email, email),
+            id_ulgi = COALESCE(p_id_ulgi, id_ulgi)
+        WHERE id_pasazera = p_id_pasazera;
+        COMMIT;
+        SELECT 'SUKCES' AS Status, p_id_pasazera AS ID_Pasazera, 'Dane zostały zaktualizowane' AS Komunikat;
+    END IF;
+END
+;;
+delimiter ;
+
+DROP PROCEDURE IF EXISTS `UsunPasazera`;
+delimiter ;;
+CREATE PROCEDURE `UsunPasazera`(
+    IN p_id_pasazera INT
+)
+BEGIN
+    DECLARE v_istnieje INT DEFAULT 0;
+    DECLARE v_ma_bilety INT DEFAULT 0;
+    DECLARE v_ma_mandaty INT DEFAULT 0;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'BŁĄD: Nie udało się usunąć pasażera.' AS Status;
+    END;
+    SELECT COUNT(*) INTO v_istnieje FROM Pasazerowie WHERE id_pasazera = p_id_pasazera;
+    IF v_istnieje = 0 THEN
+        SELECT 'BŁĄD: Pasażer o podanym ID nie istnieje.' AS Status;
+    ELSE
+        SELECT COUNT(*) INTO v_ma_bilety FROM Bilety_Sprzedane WHERE id_pasazera = p_id_pasazera;
+        SELECT COUNT(*) INTO v_ma_mandaty FROM Wezwania_Do_Zaplaty WHERE id_pasazera = p_id_pasazera;
+        IF v_ma_bilety > 0 OR v_ma_mandaty > 0 THEN
+            SELECT 'BŁĄD: Nie można usunąć pasażera - posiada powiązane bilety lub mandaty.' AS Status,
+                   v_ma_bilety AS Liczba_Biletow, v_ma_mandaty AS Liczba_Mandatow;
+        ELSE
+            START TRANSACTION;
+            DELETE FROM Pasazerowie WHERE id_pasazera = p_id_pasazera;
+            COMMIT;
+            SELECT 'SUKCES' AS Status, 'Pasażer został usunięty z systemu' AS Komunikat;
+        END IF;
+    END IF;
+END
+;;
+delimiter ;
+
+DROP PROCEDURE IF EXISTS `PobierzPasazera`;
+delimiter ;;
+CREATE PROCEDURE `PobierzPasazera`(
+    IN p_id_pasazera INT
+)
+BEGIN
+    SELECT 
+        p.id_pasazera, p.imie, p.nazwisko, p.email,
+        u.nazwa_ulgi, u.procent_znizki, p.data_rejestracji,
+        (SELECT COUNT(*) FROM Bilety_Sprzedane WHERE id_pasazera = p.id_pasazera) AS liczba_biletow,
+        (SELECT COUNT(*) FROM Wezwania_Do_Zaplaty WHERE id_pasazera = p.id_pasazera) AS liczba_mandatow
+    FROM Pasazerowie p
+    LEFT JOIN Slownik_Ulg u ON p.id_ulgi = u.id_ulgi
+    WHERE p.id_pasazera = p_id_pasazera;
+END
+;;
+delimiter ;
+
+DROP PROCEDURE IF EXISTS `GenerujRaportDzienny`;
+delimiter ;;
+CREATE PROCEDURE `GenerujRaportDzienny`(
+    IN p_data DATE
+)
+BEGIN
+    DECLARE v_bilety INT DEFAULT 0;
+    DECLARE v_przychod_bilety DECIMAL(12,2) DEFAULT 0.00;
+    DECLARE v_kontrole INT DEFAULT 0;
+    DECLARE v_mandaty INT DEFAULT 0;
+    DECLARE v_przychod_mandaty DECIMAL(12,2) DEFAULT 0.00;
+    DECLARE v_nowi_pasazerowie INT DEFAULT 0;
+    
+    SELECT COUNT(*), COALESCE(SUM(pl.kwota_brutto), 0)
+    INTO v_bilety, v_przychod_bilety
+    FROM Bilety_Sprzedane bs
+    JOIN Platnosci pl ON bs.id_biletu = pl.id_biletu
+    WHERE DATE(bs.data_zakupu) = p_data;
+    
+    SELECT COUNT(*) INTO v_kontrole FROM Kontrole_Biletow WHERE DATE(data_kontroli) = p_data;
+    
+    SELECT COUNT(*), COALESCE(SUM(kwota_mandatu), 0)
+    INTO v_mandaty, v_przychod_mandaty
+    FROM Wezwania_Do_Zaplaty w
+    JOIN Kontrole_Biletow k ON w.id_kontroli = k.id_kontroli
+    WHERE DATE(k.data_kontroli) = p_data;
+    
+    SELECT COUNT(*) INTO v_nowi_pasazerowie FROM Pasazerowie WHERE DATE(data_rejestracji) = p_data;
+    
+    INSERT INTO Raporty_Dzienne (
+        data_raportu, liczba_sprzedanych_biletow, przychod_bilety,
+        liczba_kontroli, liczba_mandatow, przychod_mandaty,
+        liczba_nowych_pasazerow, data_wygenerowania
+    ) VALUES (
+        p_data, v_bilety, v_przychod_bilety, v_kontrole, v_mandaty, 
+        v_przychod_mandaty, v_nowi_pasazerowie, NOW()
+    )
+    ON DUPLICATE KEY UPDATE
+        liczba_sprzedanych_biletow = v_bilety, przychod_bilety = v_przychod_bilety,
+        liczba_kontroli = v_kontrole, liczba_mandatow = v_mandaty,
+        przychod_mandaty = v_przychod_mandaty, liczba_nowych_pasazerow = v_nowi_pasazerowie,
+        data_wygenerowania = NOW();
+    
+    SELECT 'Raport dzienny wygenerowany' AS Status, p_data AS Data;
+END
+;;
+delimiter ;
+
+DROP PROCEDURE IF EXISTS `GenerujRaportTygodniowy`;
+delimiter ;;
+CREATE PROCEDURE `GenerujRaportTygodniowy`(
+    IN p_rok INT,
+    IN p_tydzien INT
+)
+BEGIN
+    DECLARE v_data_od DATE;
+    DECLARE v_data_do DATE;
+    DECLARE v_bilety INT DEFAULT 0;
+    DECLARE v_przychod_bilety DECIMAL(12,2) DEFAULT 0.00;
+    DECLARE v_kontrole INT DEFAULT 0;
+    DECLARE v_mandaty INT DEFAULT 0;
+    DECLARE v_przychod_mandaty DECIMAL(12,2) DEFAULT 0.00;
+    DECLARE v_nowi_pasazerowie INT DEFAULT 0;
+    
+    SET v_data_od = STR_TO_DATE(CONCAT(p_rok, ' ', p_tydzien, ' 1'), '%x %v %w');
+    SET v_data_do = DATE_ADD(v_data_od, INTERVAL 6 DAY);
+    
+    SELECT COUNT(*), COALESCE(SUM(pl.kwota_brutto), 0)
+    INTO v_bilety, v_przychod_bilety
+    FROM Bilety_Sprzedane bs
+    JOIN Platnosci pl ON bs.id_biletu = pl.id_biletu
+    WHERE DATE(bs.data_zakupu) BETWEEN v_data_od AND v_data_do;
+    
+    SELECT COUNT(*) INTO v_kontrole FROM Kontrole_Biletow WHERE DATE(data_kontroli) BETWEEN v_data_od AND v_data_do;
+    
+    SELECT COUNT(*), COALESCE(SUM(w.kwota_mandatu), 0)
+    INTO v_mandaty, v_przychod_mandaty
+    FROM Wezwania_Do_Zaplaty w
+    JOIN Kontrole_Biletow k ON w.id_kontroli = k.id_kontroli
+    WHERE DATE(k.data_kontroli) BETWEEN v_data_od AND v_data_do;
+    
+    SELECT COUNT(*) INTO v_nowi_pasazerowie FROM Pasazerowie WHERE DATE(data_rejestracji) BETWEEN v_data_od AND v_data_do;
+    
+    INSERT INTO Raporty_Tygodniowe (
+        rok, tydzien, data_od, data_do, liczba_sprzedanych_biletow, przychod_bilety,
+        liczba_kontroli, liczba_mandatow, przychod_mandaty, liczba_nowych_pasazerow, data_wygenerowania
+    ) VALUES (
+        p_rok, p_tydzien, v_data_od, v_data_do, v_bilety, v_przychod_bilety,
+        v_kontrole, v_mandaty, v_przychod_mandaty, v_nowi_pasazerowie, NOW()
+    )
+    ON DUPLICATE KEY UPDATE
+        data_od = v_data_od, data_do = v_data_do,
+        liczba_sprzedanych_biletow = v_bilety, przychod_bilety = v_przychod_bilety,
+        liczba_kontroli = v_kontrole, liczba_mandatow = v_mandaty,
+        przychod_mandaty = v_przychod_mandaty, liczba_nowych_pasazerow = v_nowi_pasazerowie,
+        data_wygenerowania = NOW();
+    
+    SELECT 'Raport tygodniowy wygenerowany' AS Status, p_rok AS Rok, p_tydzien AS Tydzien, v_data_od AS Od, v_data_do AS Do;
+END
+;;
+delimiter ;
+
+DROP PROCEDURE IF EXISTS `OznaczPrzeterminowaneBilety`;
+delimiter ;;
+CREATE PROCEDURE `OznaczPrzeterminowaneBilety`()
+BEGIN
+    DECLARE v_liczba INT DEFAULT 0;
+    SELECT COUNT(*) INTO v_liczba FROM Bilety_Sprzedane WHERE data_waznosci_do < NOW();
+    SELECT 'Przeterminowane bilety' AS Typ, v_liczba AS Liczba, NOW() AS Data_Sprawdzenia;
+END
+;;
+delimiter ;
+
+DROP PROCEDURE IF EXISTS `ObsluzPrzeterminowaneWezwania`;
+delimiter ;;
+CREATE PROCEDURE `ObsluzPrzeterminowaneWezwania`()
+BEGIN
+    DECLARE v_liczba_przeterminowanych INT DEFAULT 0;
+    DECLARE v_id_oczekujace INT;
+    SELECT id_statusu INTO v_id_oczekujace FROM Slownik_Statusow_Wezwan WHERE nazwa_statusu = 'Oczekujące';
+    SELECT COUNT(*) INTO v_liczba_przeterminowanych
+    FROM Wezwania_Do_Zaplaty WHERE id_statusu = v_id_oczekujace AND termin_platnosci < CURDATE();
+    SELECT 'Przeterminowane wezwania do zapłaty' AS Typ, v_liczba_przeterminowanych AS Liczba, NOW() AS Data_Sprawdzenia;
+END
+;;
+delimiter ;
+
+DROP VIEW IF EXISTS `Widok_Harmonogram_Dzisiejszy`;
+CREATE VIEW `Widok_Harmonogram_Dzisiejszy` AS
+SELECT h.id_kursu, p.numer_boczny AS pojazd, t.numer_linii AS linia, tl.nazwa_typu AS typ_linii,
+    h.godzina_rozpoczecia, h.godzina_zakonczenia,
+    CASE h.dzien_tygodnia WHEN 1 THEN 'Poniedziałek' WHEN 2 THEN 'Wtorek' WHEN 3 THEN 'Środa'
+        WHEN 4 THEN 'Czwartek' WHEN 5 THEN 'Piątek' WHEN 6 THEN 'Sobota' WHEN 7 THEN 'Niedziela' END AS dzien_nazwa
+FROM Harmonogram_Kursow h
+JOIN Pojazdy p ON h.id_pojazdu = p.id_pojazdu
+JOIN Trasy t ON h.id_trasy = t.id_trasy
+JOIN Slownik_Typow_Linii tl ON t.id_typu_linii = tl.id_typu_linii
+WHERE h.aktywny = 1 AND h.dzien_tygodnia = DAYOFWEEK(CURDATE())
+ORDER BY h.godzina_rozpoczecia;
+
+DROP VIEW IF EXISTS `Widok_Harmonogram_Pelny`;
+CREATE VIEW `Widok_Harmonogram_Pelny` AS
+SELECT h.id_kursu, p.numer_boczny AS pojazd, t.numer_linii AS linia, tl.nazwa_typu AS typ_linii,
+    h.godzina_rozpoczecia, h.godzina_zakonczenia,
+    TIMEDIFF(h.godzina_zakonczenia, h.godzina_rozpoczecia) AS czas_pracy,
+    CASE h.dzien_tygodnia WHEN 1 THEN 'Poniedziałek' WHEN 2 THEN 'Wtorek' WHEN 3 THEN 'Środa'
+        WHEN 4 THEN 'Czwartek' WHEN 5 THEN 'Piątek' WHEN 6 THEN 'Sobota' WHEN 7 THEN 'Niedziela' END AS dzien_nazwa,
+    h.dzien_tygodnia, h.aktywny
+FROM Harmonogram_Kursow h
+JOIN Pojazdy p ON h.id_pojazdu = p.id_pojazdu
+JOIN Trasy t ON h.id_trasy = t.id_trasy
+JOIN Slownik_Typow_Linii tl ON t.id_typu_linii = tl.id_typu_linii
+ORDER BY h.dzien_tygodnia, h.godzina_rozpoczecia;
+
+DROP VIEW IF EXISTS `Widok_Bilety_Przeterminowane`;
+CREATE VIEW `Widok_Bilety_Przeterminowane` AS
+SELECT bs.id_biletu, bs.kod_biletu, CONCAT(p.imie, ' ', p.nazwisko) AS pasazer, p.email,
+    bd.nazwa_biletu, bs.data_waznosci_od, bs.data_waznosci_do,
+    DATEDIFF(NOW(), bs.data_waznosci_do) AS dni_po_terminie
+FROM Bilety_Sprzedane bs
+JOIN Pasazerowie p ON bs.id_pasazera = p.id_pasazera
+JOIN Bilety_Definicje bd ON bs.id_definicji = bd.id_definicji
+WHERE bs.data_waznosci_do < NOW()
+ORDER BY bs.data_waznosci_do DESC;
+
+DROP VIEW IF EXISTS `Widok_Wezwania_Przeterminowane`;
+CREATE VIEW `Widok_Wezwania_Przeterminowane` AS
+SELECT w.id_wezwania, CONCAT(p.imie, ' ', p.nazwisko) AS pasazer, p.email,
+    w.kwota_mandatu, w.termin_platnosci,
+    DATEDIFF(CURDATE(), w.termin_platnosci) AS dni_po_terminie, ss.nazwa_statusu AS status
+FROM Wezwania_Do_Zaplaty w
+JOIN Pasazerowie p ON w.id_pasazera = p.id_pasazera
+JOIN Slownik_Statusow_Wezwan ss ON w.id_statusu = ss.id_statusu
+WHERE ss.nazwa_statusu = 'Oczekujące' AND w.termin_platnosci < CURDATE()
+ORDER BY w.termin_platnosci;
+
+DROP VIEW IF EXISTS `Widok_Raport_Dzienny_Ostatni`;
+CREATE VIEW `Widok_Raport_Dzienny_Ostatni` AS
+SELECT * FROM Raporty_Dzienne ORDER BY data_raportu DESC LIMIT 7;
+
+DROP VIEW IF EXISTS `Widok_Raport_Tygodniowy_Ostatni`;
+CREATE VIEW `Widok_Raport_Tygodniowy_Ostatni` AS
+SELECT * FROM Raporty_Tygodniowe ORDER BY rok DESC, tydzien DESC LIMIT 4;
+
+DROP EVENT IF EXISTS `Event_Raport_Dzienny`;
+delimiter ;;
+CREATE EVENT `Event_Raport_Dzienny`
+ON SCHEDULE EVERY 1 DAY STARTS (TIMESTAMP(CURRENT_DATE) + INTERVAL 1 DAY + INTERVAL 1 HOUR)
+ON COMPLETION PRESERVE ENABLE
+DO BEGIN
+    CALL GenerujRaportDzienny(DATE_SUB(CURDATE(), INTERVAL 1 DAY));
+END
+;;
+delimiter ;
+
+DROP EVENT IF EXISTS `Event_Raport_Tygodniowy`;
+delimiter ;;
+CREATE EVENT `Event_Raport_Tygodniowy`
+ON SCHEDULE EVERY 1 WEEK STARTS (TIMESTAMP(CURRENT_DATE + INTERVAL (7 - WEEKDAY(CURRENT_DATE)) DAY) + INTERVAL 2 HOUR)
+ON COMPLETION PRESERVE ENABLE
+DO BEGIN
+    CALL GenerujRaportTygodniowy(YEAR(DATE_SUB(CURDATE(), INTERVAL 1 DAY)), WEEK(DATE_SUB(CURDATE(), INTERVAL 1 DAY), 1));
+END
+;;
+delimiter ;
+
+DROP EVENT IF EXISTS `Event_Sprawdz_Przeterminowane_Bilety`;
+delimiter ;;
+CREATE EVENT `Event_Sprawdz_Przeterminowane_Bilety`
+ON SCHEDULE EVERY 1 HOUR ON COMPLETION PRESERVE ENABLE
+DO BEGIN
+    CALL OznaczPrzeterminowaneBilety();
+END
+;;
+delimiter ;
+
+DROP EVENT IF EXISTS `Event_Sprawdz_Przeterminowane_Wezwania`;
+delimiter ;;
+CREATE EVENT `Event_Sprawdz_Przeterminowane_Wezwania`
+ON SCHEDULE EVERY 1 DAY STARTS (TIMESTAMP(CURRENT_DATE) + INTERVAL 1 DAY + INTERVAL 8 HOUR)
+ON COMPLETION PRESERVE ENABLE
+DO BEGIN
+    CALL ObsluzPrzeterminowaneWezwania();
+END
+;;
+delimiter ;

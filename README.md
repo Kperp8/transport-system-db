@@ -145,6 +145,9 @@ Rejestr wpłat za mandaty.
 - **Widok_Rentownosc_Linii**: Podsumowanie przychodów w podziale na linie.
 - **Widok_Skutecznosc_Windykacji**: Podsumowanie informacji spłacaniu mandatów.
 - **Czasy_Przejechania_Tras**: Podsumowanie średniego czasu potrzebnego na przejechanie trasy.
+- **Aktualna_Pozycja_Pojazdow**: Podsumowanie pozycji pojazdów w systemie.
+- **Najaktywniejsci_Pasazerowie**: Podsumowanie statystyk najbardziej aktywnych pasażerów.
+- **Struktura_Ulg_Pasazera**: Podsumowanie użycia ulg w systemie.
 
 ## 7. Procedury Składowane
 

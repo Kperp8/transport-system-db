@@ -358,6 +358,62 @@ LEFT JOIN `Platnosci_Wezwan` `pw` ON `w`.`id_wezwania` = `pw`.`id_wezwania`
 GROUP BY `p`.`id_pasazera`
 HAVING `liczba_mandatow` > 0;
 
+DROP VIEW IF EXISTS `Aktualna_Pozycja_Pojazdow`;
+CREATE VIEW `Aktualna_Pozycja_Pojazdow` AS
+SELECT
+    poj.id_pojazdu,
+    poj.numer_boczny,
+    t.numer_linii,
+    tl.nazwa_typu AS typ_linii,
+    pr.nazwa_przystanku,
+    ss.nazwa_strefy,
+    pr.lokalizacja
+FROM Pojazdy poj
+JOIN Trasy t ON poj.id_trasy = t.id_trasy
+JOIN Slownik_Typow_Linii tl ON t.id_typu_linii = tl.id_typu_linii
+LEFT JOIN Przystanki pr ON poj.id_aktualnego_przystanku = pr.id_przystanku
+LEFT JOIN Slownik_Stref ss ON pr.id_strefy = ss.id_strefy;
+
+DROP VIEW IF EXISTS `Najaktywniejsci_Pasazerowie`;
+CREATE VIEW `Najaktywniejsci_Pasazerowie` AS
+SELECT
+    p.id_pasazera,
+    p.imie,
+    p.nazwisko,
+    p.email,
+    COUNT(b.id_biletu) AS liczba_biletow,
+    SUM(pl.kwota_brutto) AS laczna_kwota_brutto,
+    MAX(b.data_zakupu) AS ostatni_zakup
+FROM Pasazerowie p
+JOIN Bilety_Sprzedane b ON p.id_pasazera = b.id_pasazera
+JOIN Platnosci pl ON b.id_biletu = pl.id_biletu
+GROUP BY
+    p.id_pasazera,
+    p.imie,
+    p.nazwisko,
+    p.email
+ORDER BY liczba_biletow DESC;
+
+DROP VIEW IF EXISTS `Struktura_Ulg_Pasazera`;
+CREATE VIEW `Struktura_Ulg_Pasazera` AS
+SELECT
+    u.id_ulgi,
+    u.nazwa_ulgi,
+    u.procent_znizki,
+    COUNT(p.id_pasazera) AS liczba_pasazerow,
+    ROUND(
+        COUNT(p.id_pasazera) / 
+        (SELECT COUNT(*) FROM Pasazerowie) * 100,
+        2
+    ) AS procent_pasazerow
+FROM Slownik_Ulg u
+LEFT JOIN Pasazerowie p ON p.id_ulgi = u.id_ulgi
+GROUP BY
+    u.id_ulgi,
+    u.nazwa_ulgi,
+    u.procent_znizki
+ORDER BY liczba_pasazerow DESC;
+
 DROP FUNCTION IF EXISTS `CzyBiletWazny`;
 delimiter ;;
 CREATE FUNCTION `CzyBiletWazny`(p_id_biletu INT, p_id_pojazdu INT)

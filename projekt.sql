@@ -302,16 +302,55 @@ INSERT INTO `Wezwania_Do_Zaplaty` VALUES (2, 2, 3, 157.50, '2026-01-22', 1);
 INSERT INTO `Wezwania_Do_Zaplaty` VALUES (3, 4, 6, 250.00, '2026-01-28', 1);
 
 DROP VIEW IF EXISTS `Raport_Przychodow_Total`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Raport_Przychodow_Total` AS select (select sum(`Platnosci`.`kwota_brutto`) from `Platnosci`) AS `Suma_Bilety`,(select sum(`Platnosci_Wezwan`.`kwota_wplacona`) from `Platnosci_Wezwan`) AS `Suma_Mandaty`;
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Raport_Przychodow_Total` AS
+SELECT
+    (SELECT SUM(`Platnosci`.`kwota_brutto`) FROM `Platnosci`) AS `Suma_Bilety`,
+    (SELECT SUM(`Platnosci_Wezwan`.`kwota_wplacona`) FROM `Platnosci_Wezwan`) AS `Suma_Mandaty`;
 
 DROP VIEW IF EXISTS `Widok_Popularnosc_Linii_Biletowej`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Widok_Popularnosc_Linii_Biletowej` AS select `t`.`numer_linii` AS `numer_linii`,`bd`.`nazwa_biletu` AS `nazwa_biletu`,count(`bs`.`id_biletu`) AS `ile_razy_uzyty` from ((((`Trasy` `t` join `Pojazdy` `p` on(`t`.`id_trasy` = `p`.`id_trasy`)) join `Kontrole_Biletow` `k` on(`p`.`id_pojazdu` = `k`.`id_pojazdu`)) join `Bilety_Sprzedane` `bs` on(`k`.`id_biletu` = `bs`.`id_biletu`)) join `Bilety_Definicje` `bd` on(`bs`.`id_definicji` = `bd`.`id_definicji`)) group by `t`.`numer_linii`,`bd`.`nazwa_biletu`;
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Widok_Popularnosc_Linii_Biletowej` AS
+SELECT
+    `t`.`numer_linii` AS `numer_linii`,
+    `bd`.`nazwa_biletu` AS `nazwa_biletu`,
+    COUNT(`bs`.`id_biletu`) AS `ile_razy_uzyty`
+FROM `Trasy` `t`
+JOIN `Pojazdy` `p` ON `t`.`id_trasy` = `p`.`id_trasy`
+JOIN `Kontrole_Biletow` `k` ON `p`.`id_pojazdu` = `k`.`id_pojazdu`
+JOIN `Bilety_Sprzedane` `bs` ON `k`.`id_biletu` = `bs`.`id_biletu`
+JOIN `Bilety_Definicje` `bd` ON `bs`.`id_definicji` = `bd`.`id_definicji`
+GROUP BY `t`.`numer_linii`, `bd`.`nazwa_biletu`;
 
 DROP VIEW IF EXISTS `Widok_Rentownosc_Linii`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Widok_Rentownosc_Linii` AS select `t`.`numer_linii` AS `numer_linii`,count(distinct `bs`.`id_biletu`) AS `liczba_sprzedanych_biletow`,sum(`p`.`kwota_brutto`) AS `przychod_calkowity`,round(avg(`p`.`kwota_brutto`),2) AS `sredni_przychod_z_biletu`,max(`p`.`data_platnosci`) AS `data_ostatniej_wplaty` from ((((`Trasy` `t` left join `Pojazdy` `poj` on(`t`.`id_trasy` = `poj`.`id_trasy`)) left join `Kontrole_Biletow` `k` on(`poj`.`id_pojazdu` = `k`.`id_pojazdu`)) left join `Bilety_Sprzedane` `bs` on(`k`.`id_biletu` = `bs`.`id_biletu`)) left join `Platnosci` `p` on(`bs`.`id_biletu` = `p`.`id_biletu`)) group by `t`.`id_trasy` order by sum(`p`.`kwota_brutto`) desc;
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Widok_Rentownosc_Linii` AS
+SELECT
+    `t`.`numer_linii` AS `numer_linii`,
+    COUNT(DISTINCT `bs`.`id_biletu`) AS `liczba_sprzedanych_biletow`,
+    SUM(`p`.`kwota_brutto`) AS `przychod_calkowity`,
+    ROUND(AVG(`p`.`kwota_brutto`), 2) AS `sredni_przychod_z_biletu`,
+    MAX(`p`.`data_platnosci`) AS `data_ostatniej_wplaty`
+FROM `Trasy` `t`
+LEFT JOIN `Pojazdy` `poj` ON `t`.`id_trasy` = `poj`.`id_trasy`
+LEFT JOIN `Kontrole_Biletow` `k` ON `poj`.`id_pojazdu` = `k`.`id_pojazdu`
+LEFT JOIN `Bilety_Sprzedane` `bs` ON `k`.`id_biletu` = `bs`.`id_biletu`
+LEFT JOIN `Platnosci` `p` ON `bs`.`id_biletu` = `p`.`id_biletu`
+GROUP BY `t`.`id_trasy`
+ORDER BY SUM(`p`.`kwota_brutto`) DESC;
 
 DROP VIEW IF EXISTS `Widok_Skutecznosc_Windykacji`;
-CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Widok_Skutecznosc_Windykacji` AS select `p`.`id_pasazera` AS `id_pasazera`,`p`.`nazwisko` AS `nazwisko`,count(`w`.`id_wezwania`) AS `liczba_mandatow`,sum(`w`.`kwota_mandatu`) AS `suma_nalozona`,coalesce(sum(`pw`.`kwota_wplacona`),0) AS `suma_wplacona`,sum(`w`.`kwota_mandatu`) - coalesce(sum(`pw`.`kwota_wplacona`),0) AS `pozostalo_do_splaty`,round(coalesce(sum(`pw`.`kwota_wplacona`),0) / sum(`w`.`kwota_mandatu`) * 100,2) AS `procent_splat` from ((`Pasazerowie` `p` join `Wezwania_Do_Zaplaty` `w` on(`p`.`id_pasazera` = `w`.`id_pasazera`)) left join `Platnosci_Wezwan` `pw` on(`w`.`id_wezwania` = `pw`.`id_wezwania`)) group by `p`.`id_pasazera` having `liczba_mandatow` > 0;
+CREATE ALGORITHM = UNDEFINED SQL SECURITY DEFINER VIEW `Widok_Skutecznosc_Windykacji` AS
+SELECT
+    `p`.`id_pasazera` AS `id_pasazera`,
+    `p`.`nazwisko` AS `nazwisko`,
+    COUNT(`w`.`id_wezwania`) AS `liczba_mandatow`,
+    SUM(`w`.`kwota_mandatu`) AS `suma_nalozona`,
+    COALESCE(SUM(`pw`.`kwota_wplacona`), 0) AS `suma_wplacona`,
+    SUM(`w`.`kwota_mandatu`) - COALESCE(SUM(`pw`.`kwota_wplacona`), 0) AS `pozostalo_do_splaty`,
+    ROUND(COALESCE(SUM(`pw`.`kwota_wplacona`), 0) / SUM(`w`.`kwota_mandatu`) * 100, 2) AS `procent_splat`
+FROM `Pasazerowie` `p`
+JOIN `Wezwania_Do_Zaplaty` `w` ON `p`.`id_pasazera` = `w`.`id_pasazera`
+LEFT JOIN `Platnosci_Wezwan` `pw` ON `w`.`id_wezwania` = `pw`.`id_wezwania`
+GROUP BY `p`.`id_pasazera`
+HAVING `liczba_mandatow` > 0;
 
 DROP FUNCTION IF EXISTS `CzyBiletWazny`;
 delimiter ;;
